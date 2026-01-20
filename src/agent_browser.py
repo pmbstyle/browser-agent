@@ -44,18 +44,24 @@ class AgentBrowserWrapper:
         cmd = ["agent-browser", "open", url]
         return await self._run_command(cmd)
     
-    async def snapshot(self, interactive: bool = False) -> Dict[str, Any]:
+    async def snapshot(self, interactive: bool = False, compact: bool = False, depth: Optional[int] = None) -> Dict[str, Any]:
         """Get page snapshot.
 
         Args:
             interactive: If true, show only interactive elements
+            compact: If true, use compact output (omits verbose attributes)
+            depth: Limit tree depth (e.g., 2, 3)
 
         Returns:
             Result with ok, output, and refs
         """
-        cmd = ["agent-browser", "snapshot"]
+        cmd = ["agent-browser", "snapshot", "--json"]
         if interactive:
             cmd.append("-i")
+        if compact:
+            cmd.append("-c")
+        if depth is not None:
+            cmd.extend(["-d", str(depth)])
         return await self._run_command(cmd)
     
     async def click(self, ref: str) -> Dict[str, Any]:
@@ -92,7 +98,230 @@ class AgentBrowserWrapper:
         Returns:
             Result with ok and output
         """
-        cmd = ["agent-browser", "get", "text", f"@{ref}"]
+        cmd = ["agent-browser", "get", "text", f"@{ref}", "--json"]
+        return await self._run_command(cmd)
+    
+    async def get_value(self, ref: str) -> Dict[str, Any]:
+        """Get input value from an element.
+        
+        Args:
+            ref: Element reference (e.g., 'e1')
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "get", "value", f"@{ref}", "--json"]
+        return await self._run_command(cmd)
+    
+    async def get_url(self) -> Dict[str, Any]:
+        """Get current page URL.
+        
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "get", "url", "--json"]
+        return await self._run_command(cmd)
+    
+    async def get_title(self) -> Dict[str, Any]:
+        """Get current page title.
+        
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "get", "title", "--json"]
+        return await self._run_command(cmd)
+    
+    async def hover(self, ref: str) -> Dict[str, Any]:
+        """Hover over an element.
+        
+        Args:
+            ref: Element reference (e.g., 'e1')
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "hover", f"@{ref}"]
+        return await self._run_command(cmd)
+    
+    async def scroll(self, direction: str = "down", amount: int = 500) -> Dict[str, Any]:
+        """Scroll the page.
+        
+        Args:
+            direction: Scroll direction (up, down, left, right)
+            amount: Pixels to scroll
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "scroll", direction, str(amount)]
+        return await self._run_command(cmd)
+    
+    async def scroll_into_view(self, ref: str) -> Dict[str, Any]:
+        """Scroll element into view.
+        
+        Args:
+            ref: Element reference (e.g., 'e1')
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "scrollintoview", f"@{ref}"]
+        return await self._run_command(cmd)
+    
+    async def select(self, ref: str, value: str) -> Dict[str, Any]:
+        """Select dropdown option.
+        
+        Args:
+            ref: Element reference (e.g., 'e1')
+            value: Value to select
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "select", f"@{ref}", value]
+        return await self._run_command(cmd)
+    
+    async def press(self, key: str) -> Dict[str, Any]:
+        """Press keyboard key.
+        
+        Args:
+            key: Key to press (Enter, Escape, Tab, Control+a, etc.)
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "press", key]
+        return await self._run_command(cmd)
+    
+    async def type(self, ref: str, text: str) -> Dict[str, Any]:
+        """Type text without clearing input.
+        
+        Args:
+            ref: Element reference (e.g., 'e1')
+            text: Text to type
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "type", f"@{ref}", text]
+        return await self._run_command(cmd)
+    
+    async def check(self, ref: str) -> Dict[str, Any]:
+        """Check checkbox.
+        
+        Args:
+            ref: Element reference (e.g., 'e1')
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "check", f"@{ref}"]
+        return await self._run_command(cmd)
+    
+    async def uncheck(self, ref: str) -> Dict[str, Any]:
+        """Uncheck checkbox.
+        
+        Args:
+            ref: Element reference (e.g., 'e1')
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "uncheck", f"@{ref}"]
+        return await self._run_command(cmd)
+    
+    async def wait(self, ref: Optional[str] = None, milliseconds: Optional[int] = None, text: Optional[str] = None, networkidle: bool = False, url: Optional[str] = None) -> Dict[str, Any]:
+        """Wait for condition.
+        
+        Args:
+            ref: Wait for element by ref
+            milliseconds: Wait specific time
+            text: Wait for text to appear
+            networkidle: Wait for network to be idle
+            url: Wait for URL to match (supports glob patterns)
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "wait", "--json"]
+        if ref:
+            cmd.append(f"@{ref}")
+        elif milliseconds:
+            cmd.append(str(milliseconds))
+        elif text:
+            cmd.extend(["--text", text])
+        elif networkidle:
+            cmd.extend(["--load", "networkidle"])
+        elif url:
+            cmd.extend(["--url", url])
+        return await self._run_command(cmd)
+    
+    async def back(self) -> Dict[str, Any]:
+        """Go back in history.
+        
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "back"]
+        return await self._run_command(cmd)
+    
+    async def forward(self) -> Dict[str, Any]:
+        """Go forward in history.
+        
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "forward"]
+        return await self._run_command(cmd)
+    
+    async def reload(self) -> Dict[str, Any]:
+        """Reload current page.
+        
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "reload"]
+        return await self._run_command(cmd)
+    
+    async def screenshot(self, path: Optional[str] = None, full_page: bool = False) -> Dict[str, Any]:
+        """Take screenshot.
+        
+        Args:
+            path: Save to file path
+            full_page: Capture full page
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "screenshot"]
+        if path:
+            cmd.append(path)
+        if full_page:
+            cmd.append("--full")
+        return await self._run_command(cmd)
+    
+    async def state_save(self, path: str) -> Dict[str, Any]:
+        """Save browser state to file.
+        
+        Args:
+            path: File path to save state
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "state", "save", path]
+        return await self._run_command(cmd)
+    
+    async def state_load(self, path: str) -> Dict[str, Any]:
+        """Load browser state from file.
+        
+        Args:
+            path: File path to load state from
+            
+        Returns:
+            Result with ok and output
+        """
+        cmd = ["agent-browser", "state", "load", path]
         return await self._run_command(cmd)
     
     async def close(self) -> Dict[str, Any]:
@@ -104,24 +333,30 @@ class AgentBrowserWrapper:
         cmd = ["agent-browser", "close"]
         return await self._run_command(cmd)
     
-    async def _run_command(
-        self,
-        cmd: List[str]
-    ) -> Dict[str, Any]:
-        """Run an agent-browser command.
+    async def cleanup(self) -> None:
+        """Cleanup resources."""
+        try:
+            await self.close()
+        except Exception:
+            pass
+    
+    async def _run_command(self, cmd: List[str]) -> Dict[str, Any]:
+        """Execute an agent-browser command.
         
         Args:
-            cmd: Command and arguments
+            cmd: Command and arguments list
             
         Returns:
-            Result with ok, output, and optionally refs
+            Result dict with ok, output, and optional refs
         """
-        process = None
+        if self.logger:
+            self.logger.log_browser_command(" ".join(cmd))
+        
         try:
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
             )
             
             stdout, stderr = await asyncio.wait_for(
@@ -129,90 +364,54 @@ class AgentBrowserWrapper:
                 timeout=self.timeout
             )
             
-            stdout_text = stdout.decode("utf-8", errors="replace")
-            stderr_text = stderr.decode("utf-8", errors="replace")
+            stdout_str = stdout.decode("utf-8", errors="replace")
+            stderr_str = stderr.decode("utf-8", errors="replace")
             
-            # Log output
             if self.logger:
-                if stdout_text:
-                    for line in stdout_text.split("\n"):
-                        if line:
-                            self.logger.write_browser_log(line)
-                if stderr_text:
-                    for line in stderr_text.split("\n"):
-                        if line:
-                            self.logger.write_browser_log(f"[ERROR] {line}")
+                self.logger.log_browser_output(stdout_str)
+                if stderr_str:
+                    self.logger.log_browser_output(f"[stderr] {stderr_str}")
             
-            # Parse output for refs if present
-            refs = self._parse_refs(stdout_text)
+            # Check for error exit code
+            if process.returncode != 0:
+                error_output = stderr_str or stdout_str or f"Command failed with exit code {process.returncode}"
+                return {
+                    "ok": False,
+                    "output": truncate_output(error_output)
+                }
             
-            # Truncate output if needed
-            output = truncate_output(stdout_text + stderr_text)
+            # Try to parse JSON output
+            output = stdout_str.strip()
+            try:
+                parsed = json.loads(output)
+                # If it's a dict with expected structure, use it
+                if isinstance(parsed, dict):
+                    return {
+                        "ok": True,
+                        "output": truncate_output(parsed.get("output", output)),
+                        **{k: v for k, v in parsed.items() if k != "output"}
+                    }
+            except json.JSONDecodeError:
+                pass
             
+            # Return raw output if not JSON
             return {
-                "ok": process.returncode == 0,
-                "output": output,
-                "refs": refs if refs else None,
-                "returncode": process.returncode
+                "ok": True,
+                "output": truncate_output(output)
             }
             
         except asyncio.TimeoutError:
-            if process:
-                process.kill()
-                await process.wait()
-            raise AgentBrowserError(
-                f"Command timed out after {self.timeout}s: {' '.join(cmd)}"
-            )
+            return {
+                "ok": False,
+                "output": f"Command timed out after {self.timeout}s"
+            }
+        except FileNotFoundError:
+            return {
+                "ok": False,
+                "output": "agent-browser CLI not found. Install with: npm install -g @anthropic/agent-browser"
+            }
         except Exception as e:
-            raise AgentBrowserError(f"Command failed: {e}")
-    
-    def _parse_refs(self, output: str) -> Optional[Dict[str, Any]]:
-        """Parse element references from snapshot output.
-        
-        Args:
-            output: Command output
-            
-        Returns:
-            Dict mapping ref IDs to element info, or None if not found
-        """
-        # Look for JSON output from snapshot -i --json
-        if "refs" in output:
-            try:
-                # Try to extract JSON from the output
-                json_match = re.search(r'\{[^{}]*"refs"[^{}]*\}', output)
-                if json_match:
-                    data = json.loads(json_match.group())
-                    return data.get("refs")
-            except (json.JSONDecodeError, ValueError):
-                pass
-        
-        # Look for ref patterns in snapshot output
-        # Format: # - element [ref=e1]
-        ref_pattern = r'\[ref=([^\]]+)\]'
-        refs = {}
-        for match in re.finditer(ref_pattern, output):
-            ref_id = match.group(1)
-            # Extract element type and name from context
-            line_start = output.rfind("\n", 0, match.start()) + 1
-            line_end = output.find("\n", match.start())
-            if line_end == -1:
-                line_end = len(output)
-            line = output[line_start:line_end].strip()
-            
-            # Parse element description
-            # Example: "# - button 'Submit' [ref=e1]"
-            element_match = re.match(r'# - (\w+) (.+?) \[ref=', line)
-            if element_match:
-                refs[ref_id] = {
-                    "type": element_match.group(1),
-                    "name": element_match.group(2)
-                }
-        
-        return refs if refs else None
-    
-    async def cleanup(self) -> None:
-        """Cleanup resources."""
-        try:
-            await self.close()
-        except Exception:
-            pass
+            return {
+                "ok": False,
+                "output": f"Command execution failed: {e}"
+            }

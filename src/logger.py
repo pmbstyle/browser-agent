@@ -115,6 +115,27 @@ class SessionLogger:
             self._browser_log_handle.write(line + "\n")
             self._browser_log_handle.flush()
     
+    def log_browser_command(self, command: str) -> None:
+        """Log a browser command to the browser log.
+        
+        Args:
+            command: Command string being executed
+        """
+        timestamp = datetime.now().isoformat()
+        self.write_browser_log(f"[{timestamp}] CMD: {command}")
+    
+    def log_browser_output(self, output: str) -> None:
+        """Log browser output to the browser log.
+        
+        Args:
+            output: Output from browser command
+        """
+        timestamp = datetime.now().isoformat()
+        # Truncate very long output in log
+        if len(output) > 5000:
+            output = output[:5000] + f"\n... [truncated {len(output) - 5000} chars]"
+        self.write_browser_log(f"[{timestamp}] OUT: {output}")
+    
     def close_browser_log(self) -> None:
         """Close browser log file."""
         if self._browser_log_handle and not self._browser_log_handle.closed:

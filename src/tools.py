@@ -27,7 +27,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "browser_snapshot",
-            "description": "Get the current page snapshot with interactive elements and refs",
+            "description": "Get the current page snapshot with interactive elements and refs. Use compact=True for large pages to reduce tokens, and depth=N to limit tree depth",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -35,6 +35,16 @@ TOOLS = [
                         "type": "boolean",
                         "description": "If true, show only interactive elements",
                         "default": False
+                    },
+                    "compact": {
+                        "type": "boolean",
+                        "description": "Use compact output (omits verbose attributes) - recommended for large pages to reduce tokens",
+                        "default": False
+                    },
+                    "depth": {
+                        "type": "integer",
+                        "description": "Limit tree depth (e.g., 2, 3) - reduces output size significantly",
+                        "default": None
                     }
                 }
             }
@@ -92,6 +102,301 @@ TOOLS = [
                     }
                 },
                 "required": ["ref"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_get_value",
+            "description": "Get input value from an element",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "description": "Element reference from the snapshot (e.g., 'e1')"
+                    }
+                },
+                "required": ["ref"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_get_url",
+            "description": "Get current page URL",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_get_title",
+            "description": "Get current page title",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_hover",
+            "description": "Hover over an element to reveal tooltips/dropdowns",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "description": "Element reference from the snapshot (e.g., 'e1')"
+                    }
+                },
+                "required": ["ref"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_scroll",
+            "description": "Scroll the page or element into view",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "direction": {
+                        "type": "string",
+                        "description": "Scroll direction (up, down, left, right)",
+                        "default": "down"
+                    },
+                    "amount": {
+                        "type": "integer",
+                        "description": "Pixels to scroll",
+                        "default": 500
+                    },
+                    "ref": {
+                        "type": "string",
+                        "description": "Optional element reference - if provided, scrolls element into view instead of page"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_select",
+            "description": "Select a dropdown option",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "description": "Element reference from the snapshot (e.g., 'e1')"
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "Value to select"
+                    }
+                },
+                "required": ["ref", "value"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_press",
+            "description": "Press keyboard key (Enter, Escape, Tab, Control+a, etc.)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "Key to press (Enter, Escape, Tab, Control+a, etc.)"
+                    }
+                },
+                "required": ["key"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_type",
+            "description": "Type text without clearing the input field (unlike fill which clears first)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "description": "Element reference from the snapshot (e.g., 'e1')"
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": "Text to type"
+                    }
+                },
+                "required": ["ref", "text"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_check",
+            "description": "Check a checkbox",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "description": "Element reference from the snapshot (e.g., 'e1')"
+                    }
+                },
+                "required": ["ref"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_uncheck",
+            "description": "Uncheck a checkbox",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "description": "Element reference from the snapshot (e.g., 'e1')"
+                    }
+                },
+                "required": ["ref"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_wait",
+            "description": "Wait for a condition (element, time, text, network idle, or URL)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "description": "Optional element reference to wait for"
+                    },
+                    "milliseconds": {
+                        "type": "integer",
+                        "description": "Wait for specific milliseconds"
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": "Wait for text to appear"
+                    },
+                    "networkidle": {
+                        "type": "boolean",
+                        "description": "Wait until network is idle"
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "Wait until URL matches (supports glob patterns)"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_back",
+            "description": "Go back in browser history",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_forward",
+            "description": "Go forward in browser history",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_reload",
+            "description": "Reload the current page",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_screenshot",
+            "description": "Take screenshot for debugging (optional: save to file, capture full page)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Optional file path to save screenshot"
+                    },
+                    "full_page": {
+                        "type": "boolean",
+                        "description": "Capture full page instead of viewport",
+                        "default": False
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_state_save",
+            "description": "Save browser state to file for session persistence",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File path to save state"
+                    }
+                },
+                "required": ["path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_state_load",
+            "description": "Load browser state from file to restore session",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File path to load state from"
+                    }
+                },
+                "required": ["path"]
             }
         }
     },
