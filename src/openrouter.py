@@ -12,6 +12,17 @@ DEFAULT_MODEL = "anthropic/claude-sonnet-4"
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODELS_URL = "https://openrouter.ai/api/v1/models"
 
+# Static fallback pricing for common models (per 1M tokens)
+STATIC_PRICING = {
+    "anthropic/claude-sonnet-4": {"input": 15.00, "output": 75.00},
+    "anthropic/claude-3.5-sonnet": {"input": 3.00, "output": 15.00},
+    "anthropic/claude-3-haiku": {"input": 0.25, "output": 1.25},
+    "openai/gpt-4o": {"input": 2.50, "output": 10.00},
+    "openai/gpt-4o-mini": {"input": 0.15, "output": 0.60},
+    "google/gemini-2.0-flash-exp": {"input": 0.075, "output": 0.30},
+    "meta-llama/llama-3.1-405b-instruct": {"input": 0.70, "output": 0.70},
+}
+
 
 class OpenRouterError(Exception):
     """Error from OpenRouter API."""
@@ -44,8 +55,10 @@ class OpenRouterClient:
         self.model = model or os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)
         self.timeout = timeout
         self.client = httpx.AsyncClient(timeout=timeout)
+        
+        # Instance-level pricing cache (not per-call)
+        self._cached_pricing: Optional[Dict[str, float]] = None
 
-    @lru_cache(maxsize=1)
     async def get_model_pricing(self, model_name: str) -> Dict[str, float]:
         """Get pricing for a specific model from OpenRouter API.
 
@@ -54,8 +67,12 @@ class OpenRouterClient:
 
         Returns:
             Dict with 'input' and 'output' pricing per 1M tokens
-            Defaults to {'input': 0, 'output': 0} if model not found
+            Falls back to static pricing if API fetch fails
         """
+        # Check instance cache first
+        if self._cached_pricing is not None:
+            return self._cached_pricing
+
         try:
             # Fetch models list
             async with self.client.stream("GET", MODELS_URL) as response:
@@ -68,15 +85,22 @@ class OpenRouterClient:
                     for model in models:
                         if model.get("id") == model_name:
                             pricing = model.get("pricing", {})
-                            return {
+                            result = {
                                 "input": float(pricing.get("prompt", 0)),
                                 "output": float(pricing.get("completion", 0))
                             }
-        except Exception:
-            pass
+                            # Cache the result
+                            self._cached_pricing = result
+                            return result
+        except Exception as e:
+            # Log warning and use fallback
+            if self.api_key:  # Only log if we have an API key
+                import sys
+                print(f"[WARNING] Failed to fetch pricing from OpenRouter: {e}", file=sys.stderr)
+                print(f"[INFO] Using fallback pricing for {model_name}", file=sys.stderr)
 
-        # Return default pricing if not found
-        return {"input": 0.0, "output": 0.0}
+        # Return fallback from static pricing
+        return STATIC_PRICING.get(model_name, {"input": 0.0, "output": 0.0})
     
     async def stream_chat_completion(
         self,

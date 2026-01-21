@@ -265,10 +265,6 @@ class CLI:
                 debug=self.debug
             )
 
-        # Display user input
-        self.console.print("\n[bold]You:[/bold] ", end="")
-        self.console.print(task, style="white")
-
         # Variables for handling multiple message panels
         full_response = ""
         tool_log = ""
@@ -343,8 +339,20 @@ class CLI:
                     completion = chunk.get("completion_tokens", 0)
                     total = chunk.get("total_tokens", 0)
                     cost = chunk.get("cost_usd", 0)
+                    
+                    # Get per-query breakdown if available
+                    query_prompt = chunk.get("query_prompt_tokens", 0)
+                    query_completion = chunk.get("query_completion_tokens", 0)
+                    query_total = chunk.get("query_total_tokens", 0)
+                    query_cost = chunk.get("query_cost_usd", 0)
+                    
+                    if query_total > 0:
+                        self.console.print(
+                            f"[dim]Query: {query_prompt:,} + {query_completion:,} = {query_total:,} | Query Cost: ${query_cost:.4f}[/dim]"
+                        )
+                    
                     self.console.print(
-                        f"[dim]Tokens: {prompt:,} prompt + {completion:,} completion = {total:,} total | Cost: ${cost:.4f}[/dim]"
+                        f"[dim]Session: {prompt:,} prompt + {completion:,} completion = {total:,} total | Session Cost: ${cost:.4f}[/dim]"
                     )
 
         except KeyboardInterrupt:

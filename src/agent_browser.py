@@ -44,13 +44,13 @@ class AgentBrowserWrapper:
         cmd = ["agent-browser", "open", url]
         return await self._run_command(cmd)
     
-    async def snapshot(self, interactive: bool = False, compact: bool = False, depth: Optional[int] = None) -> Dict[str, Any]:
+    async def snapshot(self, interactive: bool = False, compact: bool = True, depth: Optional[int] = 2) -> Dict[str, Any]:
         """Get page snapshot.
 
         Args:
             interactive: If true, show only interactive elements
-            compact: If true, use compact output (omits verbose attributes)
-            depth: Limit tree depth (e.g., 2, 3)
+            compact: If true, use compact output (omits verbose attributes) - defaults to True for token efficiency
+            depth: Limit tree depth (e.g., 2, 3) - defaults to 2 for compact output
 
         Returns:
             Result with ok, output, and refs

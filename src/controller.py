@@ -50,9 +50,90 @@ class AgentController:
         # Token tracking
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
+        self.query_prompt_tokens = 0
+        self.query_completion_tokens = 0
 
         # Cached pricing (will be fetched from API if not in static dict)
         self._cached_pricing: Optional[Dict[str, float]] = None
+
+        # Sliding window: limit conversation history size
+        self.MAX_HISTORY_MESSAGES = 12  # Reduced from 15
+        self.MAX_SUMMARIZED_HISTORY = 6  # Reduced from 8
+        
+        # Aggressive summarization for large outputs
+        self.SNAPSHOT_RESULT_TOKEN_LIMIT = 1000  # Reduced from 2000
+
+    def _summarize_snapshot_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Summarize a snapshot result to reduce tokens while preserving key info.
+        
+        Args:
+            result: Result dict from browser_snapshot tool
+            
+        Returns:
+            Minimized result dict
+        """
+        output = result.get("output", "")
+        
+        if not isinstance(output, dict):
+            # Not a dict, return basic summary
+            return {
+                "ok": result.get("ok", False),
+                "output": f"[Snapshot summarized - {len(str(output))} characters]"
+            }
+        
+        refs = output.get("refs", {})
+        snapshot = output.get("snapshot", "")
+        
+        # Simplified approach: just keep summary, not the refs dict
+        # This dramatically reduces token usage
+        minimized = {
+            "ok": result.get("ok", False),
+            "output": f"[Snapshot summarized: {len(refs)} interactive elements, {len(snapshot)} chars of page content]"
+        }
+        
+        return minimized
+
+    def _summarize_tool_result(self, tool_name: str, result: Dict[str, Any]) -> str:
+        """Summarize a tool result for conversation history.
+        
+        Args:
+            tool_name: Name of the tool that was called
+            result: Result dict from tool execution
+            
+        Returns:
+            Brief summary string
+        """
+        if not result.get("ok"):
+            return f"{tool_name} failed"
+        
+        output = result.get("output", "")
+        
+        # For different tool types, create appropriate summaries
+        if tool_name == "browser_open":
+            return f"Opened URL: {output[:100] if output else 'unknown'}"
+        elif tool_name == "browser_snapshot":
+            # Minimal summary - just key metrics
+            if isinstance(output, dict):
+                refs = output.get("refs", {})
+                return f"Snapshot: {len(refs)} interactive elements"
+            return "Snapshot taken"
+        elif tool_name == "browser_screenshot":
+            return "Captured screenshot"
+        elif tool_name == "browser_click":
+            return f"Clicked element"
+        elif tool_name == "browser_fill":
+            return f"Filled input field"
+        elif tool_name == "browser_get_text":
+            return f"Retrieved text: {output[:100]}..."
+        elif tool_name == "browser_scroll":
+            return f"Scrolled page"
+        elif tool_name == "browser_back":
+            return "Navigated back"
+        elif tool_name == "browser_forward":
+            return "Navigated forward"
+        else:
+            # Generic summary for other tools
+            return f"{tool_name} executed"
 
     def _build_system_prompt(self) -> str:
         """Build the system prompt for the LLM.
@@ -137,6 +218,18 @@ Use refs from snapshots to interact:
 4. **Interactive-only default** - Use `browser_snapshot(interactive=True)` by default to ignore non-interactive elements
 5. **Smart waiting** - Use `browser_wait(networkidle=True)` after navigation instead of manual delays
 
+### Content Type Limitations
+**IMPORTANT:** Browser snapshots cannot extract text content from:
+- PDF files (.pdf)
+- Binary downloads (images, executables, etc.)
+- Some document viewers (depends on browser support)
+
+When you encounter such content:
+1. The snapshot will show visual elements but no readable text
+2. Look for HTML versions or alternative accessible content
+3. Don't assume page is empty - it's just not readable by snapshots
+4. If a PDF is linked, mention that text extraction is not possible via browser tools
+
 ### Workflow Patterns
 - Don't snapshot if page hasn't changed (use wait instead)
 - Verify navigation with get_url before snapshotting
@@ -191,6 +284,10 @@ EXAMPLE OF CORRECT BEHAVIOR:
         # Log and add user message to conversation history
         self.logger.log_message("user", user_task)
         self.messages.append(format_message("user", user_task))
+        
+        # Reset per-query token counters
+        self.query_prompt_tokens = 0
+        self.query_completion_tokens = 0
 
         # Build messages for API call
         api_messages = [
@@ -335,15 +432,18 @@ EXAMPLE OF CORRECT BEHAVIOR:
                         continue
 
                     # Track action for loop detection
+                    # Only track exact signature for repetition detection
                     action_sig = f"{tool_call.name}:{json.dumps(tool_call.args, sort_keys=True)}"
                     self.recent_actions.append(action_sig)
-
-                    # Keep only last 10 actions for loop detection
                     if len(self.recent_actions) > 10:
                         self.recent_actions.pop(0)
 
-                    # Check for loop: same action 3+ times in recent actions
-                    if self.recent_actions.count(action_sig) >= 3:
+                    # DISABLED: Pattern-based loop detection (too aggressive)
+                    # Normal navigation sequences (snapshot -> click -> snapshot -> click) 
+                    # were being flagged as loops. Only detect exact repetition.
+                    exact_loop = self.recent_actions.count(action_sig) >= 5
+                    
+                    if exact_loop:
                         yield {
                             "type": "loop_detected",
                             "action": tool_call.name,
@@ -375,6 +475,7 @@ EXAMPLE OF CORRECT BEHAVIOR:
 
         # Yield usage and cost summary
         total_tokens = self.total_prompt_tokens + self.total_completion_tokens
+        query_tokens = self.query_prompt_tokens + self.query_completion_tokens
 
         # Get pricing from OpenRouter API
         if self._cached_pricing is None:
@@ -382,13 +483,18 @@ EXAMPLE OF CORRECT BEHAVIOR:
         pricing = self._cached_pricing or {"input": 0, "output": 0}
 
         cost = (self.total_prompt_tokens * pricing["input"] + self.total_completion_tokens * pricing["output"]) / 1_000_000
+        query_cost = (self.query_prompt_tokens * pricing["input"] + self.query_completion_tokens * pricing["output"]) / 1_000_000
 
         yield {
             "type": "usage",
             "prompt_tokens": self.total_prompt_tokens,
             "completion_tokens": self.total_completion_tokens,
             "total_tokens": total_tokens,
-            "cost_usd": cost
+            "cost_usd": cost,
+            "query_prompt_tokens": self.query_prompt_tokens,
+            "query_completion_tokens": self.query_completion_tokens,
+            "query_total_tokens": query_tokens,
+            "query_cost_usd": query_cost
         }
 
     async def _execute_tool_call(
@@ -438,13 +544,61 @@ EXAMPLE OF CORRECT BEHAVIOR:
                 "content": f"Tool result: ok={result['ok']}"
             }
 
-        # Feed result back to API messages
-        tool_message = format_tool_message(
-            tool_call.call_id or "unknown",
-            json.dumps(result)
-        )
+        # Feed result back to API messages - with summarization for snapshots
+        if tool_call.name == "browser_screenshot" and result.get("ok"):
+            # Create a minimized version for conversation history
+            minimized_result = {
+                "ok": result["ok"],
+                "output": "[Screenshot captured - image not included in conversation history]"
+            }
+            tool_message = format_tool_message(
+                tool_call.call_id or "unknown",
+                json.dumps(minimized_result)
+            )
+        elif tool_call.name == "browser_snapshot" and result.get("ok"):
+            # ALWAYS summarize snapshots - send summarized version to API
+            # Raw snapshots go to log but minimized version goes to API
+            minimized_result = self._summarize_snapshot_result(result)
+            tool_message = format_tool_message(
+                tool_call.call_id or "unknown",
+                json.dumps(minimized_result)
+            )
+        else:
+            tool_message = format_tool_message(
+                tool_call.call_id or "unknown",
+                json.dumps(result)
+            )
         api_messages.append(tool_message)
-        self.messages.append(tool_message)
+        
+        # Implement sliding window: summarize old tool results
+        if len(self.messages) > self.MAX_HISTORY_MESSAGES:
+            # We need to reduce history size. Strategy:
+            # 1. Keep user/assistant messages (they contain important context)
+            # 2. Summarize old tool results to reduce their size
+            # 3. Only remove very old messages if we're still over limit after summarizing
+            
+            messages_to_summarize = len(self.messages) - self.MAX_SUMMARIZED_HISTORY
+            
+            for i in range(messages_to_summarize):
+                msg = self.messages[i]
+                if msg.get("role") == "tool":
+                    try:
+                        tool_content = json.loads(msg.get("content", "{}"))
+                        tool_name = tool_content.get("tool", "unknown")
+                        summary = self._summarize_tool_result(tool_name, tool_content)
+                        # Replace full tool result with brief summary
+                        msg["content"] = json.dumps({
+                            "tool": tool_name,
+                            "ok": tool_content.get("ok", True),
+                            "output": summary
+                        })
+                    except (json.JSONDecodeError, KeyError):
+                        msg["content"] = "[Previous tool result summarized]"
+            
+            # If still over limit after summarizing, remove oldest messages
+            # (but keep at least MAX_SUMMARIZED_HISTORY)
+            while len(self.messages) > self.MAX_SUMMARIZED_HISTORY:
+                self.messages.pop(0)
 
     async def _run_tool(self, tool_call: ToolCall) -> Dict[str, Any]:
         """Run a tool call.

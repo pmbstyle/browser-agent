@@ -510,7 +510,7 @@ def format_tool_result(
     return result
 
 
-def truncate_output(output: str, max_size: int = 50000) -> str:
+def truncate_output(output: str, max_size: int = 10000) -> str:
     """Truncate output if too large.
     
     Args:
@@ -523,7 +523,22 @@ def truncate_output(output: str, max_size: int = 50000) -> str:
     if len(output) <= max_size:
         return output
     
+    # Try to truncate at a reasonable boundary (end of line or sentence)
+    truncated = output[:max_size]
+    
+    # Find last newline to avoid cutting mid-line
+    last_newline = truncated.rfind('\n')
+    if last_newline > max_size * 0.9:  # Only if newline is within last 10%
+        truncated = truncated[:last_newline]
+    
+    # Find last sentence end to avoid cutting mid-sentence
+    for sep in ['. ', '!', '?', '\n']:
+        last_sep = truncated.rfind(sep)
+        if last_sep > max_size * 0.9:
+            truncated = truncated[:last_sep + 1]
+            break
+    
     return (
-        output[:max_size]
-        + f"\n\n[Output truncated: {len(output)} total characters]"
+        truncated
+        + f"\n\n[Output truncated: {len(output)} total characters, showing first {len(truncated)}]"
     )
